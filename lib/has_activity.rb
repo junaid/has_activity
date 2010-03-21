@@ -49,8 +49,7 @@ module Elctech
           case options[:group_by]
           when :hour
             sql_statement = sanitize_sql(
-              ["SELECT
-                  #{activity_options[:by]} AS timestamp,
+              ["SELECT                  
                   COUNT(*) AS activity_count,
                   ((((YEAR(now()) - YEAR(#{activity_options[:by]}))*365)+(DAYOFYEAR(now())-DAYOFYEAR(#{activity_options[:by]})))*24)+(HOUR(now())-HOUR(#{activity_options[:by]})) as hours_ago,
                   CONCAT(YEAR(#{activity_options[:by]}), CONCAT(DAYOFYEAR(#{activity_options[:by]}), HOUR(#{activity_options[:by]}))) AS unique_hour
@@ -65,8 +64,7 @@ module Elctech
             oldest_possible_unit = ((Time.now-since)/60)/60
           when :week
             sql_statement = sanitize_sql(
-              ["SELECT
-                  #{activity_options[:by]} AS timestamp,
+              ["SELECT                 
                   COUNT(*) AS activity_count,
                   ((YEAR(now()) - YEAR(#{activity_options[:by]}))*52)+(WEEK(now())-WEEK(#{activity_options[:by]})) as weeks_ago,
                   YEARWEEK(#{activity_options[:by]}) AS unique_week
@@ -81,8 +79,7 @@ module Elctech
             oldest_possible_unit = ((((Time.now-since)/60)/60)/24)/7
           else
             sql_statement = sanitize_sql(
-              ["SELECT
-                  #{activity_options[:by]} AS timestamp,
+              ["SELECT                  
                   COUNT(*) AS activity_count,
                   DATEDIFF(now(), #{activity_options[:by]}) as days_ago
                 FROM #{self.table_name}
@@ -105,8 +102,7 @@ module Elctech
           results.inject([]) do |rs,r|
             entry = {
               :offset => r[unit].to_i,
-              :activity => r["activity_count"].to_i,
-              :date => Time.parse(r["timestamp"])
+              :activity => r["activity_count"].to_i            
             }
             (order == :asc) ? rs.push(entry) : rs.unshift(entry)
           end
@@ -122,8 +118,7 @@ module Elctech
             if current_result_index < results.size && results[current_result_index][unit].to_i == current_unit_offset
               entry = {
                 :offset => current_unit_offset,
-                :activity => results[current_result_index]["activity_count"].to_i,
-                :created_at => Time.parse(results[current_result_index]["timestamp"])
+                :activity => results[current_result_index]["activity_count"].to_i                
               }
               current_result_index = current_result_index+1
             else
@@ -137,8 +132,7 @@ module Elctech
               end
               entry = {
                 :offset => current_unit_offset,
-                :activity => 0,
-                :created_at => created_at_given_offset
+                :activity => 0                
               }
             end
             current_unit_offset = current_unit_offset-1
