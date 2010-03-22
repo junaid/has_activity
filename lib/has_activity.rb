@@ -46,23 +46,43 @@ module Elctech
           options[:order] ||= :asc
           options[:group_by] ||= :day
           
+          db_adapter_name = ActiveRecord::Base::connection.instance_variable_get(:@config)[:adapter]
+          
           case options[:group_by]
           when :hour
-            sql_statement = sanitize_sql(
-              ["SELECT                  
-                  COUNT(*) AS activity_count,
-                  ((((YEAR(now()) - YEAR(#{activity_options[:by]}))*365)+(DAYOFYEAR(now())-DAYOFYEAR(#{activity_options[:by]})))*24)+(HOUR(now())-HOUR(#{activity_options[:by]})) as hours_ago,
-                  CONCAT(YEAR(#{activity_options[:by]}), CONCAT(DAYOFYEAR(#{activity_options[:by]}), HOUR(#{activity_options[:by]}))) AS unique_hour
-                FROM feeds
-                WHERE #{activity_scope} AND #{activity_options[:by]} > ?
-                GROUP BY unique_hour
-                ORDER BY #{activity_options[:by]} ASC",
-                since.to_s(:db)
-              ]
-            )
+            if db_adapter_name == 'mysql'
+              sql_statement = sanitize_sql(
+                ["SELECT
+                    COUNT(*) AS activity_count,
+                    ((((YEAR(now()) - YEAR(#{activity_options[:by]}))*365)+(DAYOFYEAR(now())-DAYOFYEAR(#{activity_options[:by]})))*24)+(HOUR(now())-HOUR(#{activity_options[:by]})) as hours_ago,
+                    CONCAT(YEAR(#{activity_options[:by]}), CONCAT(DAYOFYEAR(#{activity_options[:by]}), HOUR(#{activity_options[:by]}))) AS unique_hour
+                  FROM #{self.table_name}
+                  WHERE #{activity_scope} AND #{activity_options[:by]} > ?
+                  GROUP BY unique_hour
+                  ORDER BY #{activity_options[:by]} ASC",
+                  since.to_s(:db)
+                ]
+              )
+            elsif db_adapter_name == 'postgresql'
+               sql_statement = sanitize_sql(
+                [
+                  "SELECT count(*) as activity_count, hours_ago from
+                (
+                  SELECT created_at,
+                 ((((EXTRACT(year from now()) - EXTRACT(year from #{activity_options[:by]}))*365)  +(EXTRACT(day from now())-EXTRACT(day from #{activity_options[:by]})))*24)+(EXTRACT(hour from now())-EXTRACT(hour from #{activity_options[:by]})) as hours_ago
+                  FROM #{self.table_name}
+                  WHERE #{activity_scope} AND #{activity_options[:by]} > ?
+                  ORDER BY #{activity_options[:by]} ASC) as temporary
+                 GROUP BY temporary.hours_ago
+                 ORDER BY temporary.hours_ago DESC
+                  ",since.to_s(:db)])
+
+            end
             unit = "hours_ago"
             oldest_possible_unit = ((Time.now-since)/60)/60
           when :week
+
+            if db_adapter_name == 'mysql'
             sql_statement = sanitize_sql(
               ["SELECT                 
                   COUNT(*) AS activity_count,
@@ -75,9 +95,26 @@ module Elctech
                 since.to_s(:db)
               ]
             )
-            unit = "weeks_ago"
+            elsif db_adapter_name == 'postgresql'
+              sql_statement = sanitize_sql(
+                [
+                  "SELECT count(*) as activity_count, weeks_ago from
+                (
+                  SELECT created_at,
+                 ((EXTRACT(year from now()) - EXTRACT(year from #{activity_options[:by]}))*52)+(EXTRACT(week from now())-EXTRACT(week from #{activity_options[:by]})) as weeks_ago
+                  FROM #{self.table_name}
+                  WHERE #{activity_scope} AND #{activity_options[:by]} > ?
+                  ORDER BY #{activity_options[:by]} ASC) as temporary
+                 GROUP BY temporary.weeks_ago
+                 ORDER BY temporary.weeks_ago DESC
+                  ",since.to_s(:db)])
+              
+            end
+            
+            unit = "weeks_ago"                                                
             oldest_possible_unit = ((((Time.now-since)/60)/60)/24)/7
           else
+            if db_adapter_name == 'mysql'             
             sql_statement = sanitize_sql(
               ["SELECT                  
                   COUNT(*) AS activity_count,
@@ -89,6 +126,21 @@ module Elctech
                 since.to_s(:db)
               ]
             )
+            elsif db_adapter_name == 'postgresql'
+              sql_statement = sanitize_sql(
+                [
+                  "SELECT count(*) as activity_count, days_ago from
+                (
+                  SELECT #{activity_options[:by]},
+                 to_char((now() - #{activity_options[:by]}),'DDD') as days_ago
+                  FROM #{self.table_name}
+                  WHERE #{activity_scope} AND #{activity_options[:by]} > ?
+                  ORDER BY #{activity_options[:by]} ASC) as temporary
+                 GROUP BY temporary.days_ago
+                 ORDER BY temporary.days_ago DESC
+                  ",since.to_s(:db)])
+            end
+            
             unit = "days_ago"
             oldest_possible_unit = (((Time.now-since)/60)/60)/24
           end
