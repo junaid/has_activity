@@ -68,7 +68,7 @@ module Elctech
                 [
                   "SELECT count(*) as activity_count, hours_ago from
                 (
-                  SELECT created_at,
+                  SELECT 
                  ((((EXTRACT(year from now()) - EXTRACT(year from #{activity_options[:by]}))*365)  +(EXTRACT(day from now())-EXTRACT(day from #{activity_options[:by]})))*24)+(EXTRACT(hour from now())-EXTRACT(hour from #{activity_options[:by]})) as hours_ago
                   FROM #{self.table_name}
                   WHERE #{activity_scope} AND #{activity_options[:by]} > ?
@@ -80,8 +80,8 @@ module Elctech
             end
             unit = "hours_ago"
             oldest_possible_unit = ((Time.now-since)/60)/60
-          when :week
 
+          when :week
             if db_adapter_name == 'mysql'
             sql_statement = sanitize_sql(
               ["SELECT                 
@@ -100,7 +100,7 @@ module Elctech
                 [
                   "SELECT count(*) as activity_count, weeks_ago from
                 (
-                  SELECT created_at,
+                  SELECT 
                  ((EXTRACT(year from now()) - EXTRACT(year from #{activity_options[:by]}))*52)+(EXTRACT(week from now())-EXTRACT(week from #{activity_options[:by]})) as weeks_ago
                   FROM #{self.table_name}
                   WHERE #{activity_scope} AND #{activity_options[:by]} > ?
@@ -111,8 +111,9 @@ module Elctech
               
             end
             
-            unit = "weeks_ago"                                                
+            unit = "weeks_ago"
             oldest_possible_unit = ((((Time.now-since)/60)/60)/24)/7
+            
           else
             if db_adapter_name == 'mysql'             
             sql_statement = sanitize_sql(
@@ -131,7 +132,7 @@ module Elctech
                 [
                   "SELECT count(*) as activity_count, days_ago from
                 (
-                  SELECT #{activity_options[:by]},
+                  SELECT 
                  to_char((now() - #{activity_options[:by]}),'DDD') as days_ago
                   FROM #{self.table_name}
                   WHERE #{activity_scope} AND #{activity_options[:by]} > ?
